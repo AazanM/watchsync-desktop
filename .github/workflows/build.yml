@@ -5,6 +5,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   tests:
     runs-on: macos-14
@@ -38,6 +41,15 @@ jobs:
         with:
           name: WatchSync-Desktop-1.7.6-Setup
           path: dist/WatchSync-Desktop-1.7.6-Setup.exe
+      # Publish straight from the runner. Pulling a 28 MB artifact down to a
+      # laptop and pushing it back up is the slowest and least reliable leg of
+      # the release, so the machine that built the installer attaches it.
+      - name: Attach installer to the release
+        if: ${{ github.ref == 'refs/heads/watchsync-desktop' && hashFiles('dist/WatchSync-Desktop-1.7.6-Setup.exe') != '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload v1.7.6 "dist/WatchSync-Desktop-1.7.6-Setup.exe" --clobber --repo "$GITHUB_REPOSITORY"
 
   macos:
     runs-on: macos-15-intel
@@ -59,3 +71,8 @@ jobs:
         with:
           name: WatchSync-Desktop-1.7.6-macOS-universal
           path: dist/WatchSync-Desktop-1.7.6-macOS-universal.zip
+      - name: Attach app archive to the release
+        if: ${{ github.ref == 'refs/heads/watchsync-desktop' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload v1.7.6 "dist/WatchSync-Desktop-1.7.6-macOS-universal.zip" --clobber --repo "$GITHUB_REPOSITORY"

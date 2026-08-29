@@ -122,7 +122,7 @@ class SyncClientProtocol(JSONCommandProtocol):
                     pass
         except:
             pass
-        self._client.destroyProtocol()
+        self._client.destroyProtocol(self)
 
     def dropWithError(self, error):
         self._client.ui.showErrorMessage(error)

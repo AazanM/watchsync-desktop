@@ -4,6 +4,7 @@ import os
 import setuptools
 
 from syncplay import projectURL, version as syncplay_version
+from syncplay.product import PRODUCT_NAME
 
 def read(fname):
     with open(fname, 'r') as f:
@@ -13,14 +14,11 @@ installRequirements = read('requirements.txt').splitlines() +\
                         read('requirements_gui.txt').splitlines()
 
 setuptools.setup(
-    name="syncplay",
+    name="watchsync-desktop",
     version=syncplay_version,
-    author="Syncplay",
+    author="{} (based on Syncplay)".format(PRODUCT_NAME),
     author_email="dev@syncplay.pl",
-    description=' '.join([
-        'Client/server to synchronize media playback',
-        'on mpv/VLC/MPC-HC/MPC-BE on many computers'
-    ]),
+    description='Syncplay-compatible desktop client with an overlay-only floating chat.',
     long_description=read('README.md'),
     long_description_content_type="text/markdown",
     url=projectURL,
@@ -34,6 +32,7 @@ setuptools.setup(
         ],
         'gui_scripts': [
             'syncplay = syncplay.ep_client:main',
+            'watchsync-desktop = syncplay.ep_client:main',
         ]
     },
     include_package_data=True,

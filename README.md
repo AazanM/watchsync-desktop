@@ -21,7 +21,13 @@
 # SOFTWARE.
 -->
 
-# Syncplay
+# WatchSync Desktop
+
+This repository is the WatchSync Desktop personal fork of Syncplay 1.7.6. It keeps the Syncplay protocol and player synchronization behavior while moving chat into a floating, always-on-top overlay. See [WATCHSYNC.md](WATCHSYNC.md) for usage, private-server hosting, tests, and packaging.
+
+The original Syncplay project information and attribution follow.
+
+# Syncplay (upstream)
 ![GitHub Actions build status](https://github.com/Syncplay/syncplay/workflows/Build/badge.svg)
 
 Solution to synchronize video playback across multiple instances of mpv, VLC, MPC-HC, MPC-BE and mplayer2 over the Internet.

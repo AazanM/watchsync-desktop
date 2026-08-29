@@ -1,0 +1,2 @@
+"""WatchSync Desktop test suite."""
+

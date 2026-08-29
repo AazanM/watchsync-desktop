@@ -1,6 +1,11 @@
 certifi>=2018.11.29
 pem>=21.2.0
 twisted[tls]>=16.4.0
+# Current pyOpenSSL releases require cryptography versions that do not publish
+# universal2 wheels. These compatible bounds keep the unsigned macOS build
+# genuinely Intel + Apple Silicon without changing Syncplay's TLS behavior.
+pyopenssl>=25.2.0,<26.2
+cryptography>=46,<48
 appnope>=0.1.0; sys_platform == 'darwin'
 pypiwin32>=223; sys_platform == 'win32'
 zope.interface>=4.4.0; sys_platform == 'win32'

@@ -158,10 +158,13 @@ class SyncplayClient(object):
         self._protocol = protocol
         self._lastGlobalUpdate = time.time()
 
-    def destroyProtocol(self):
+    def destroyProtocol(self, protocol=None):
+        if protocol is not None and self._protocol is not protocol:
+            return
         if self._protocol:
             self._protocol.drop()
         self._protocol = None
+        self.ui.setConnected(False, self.getRoom())
 
     def initPlayer(self, player):
         self._player = player
@@ -788,6 +791,7 @@ class SyncplayClient(object):
 
     def connected(self):
         self.lastConnectTime = time.time()
+        self.ui.setConnected(True, self.getRoom())
         readyState = self._config['readyAtStart'] if self.userlist.currentUser.isReady() is None else self.userlist.currentUser.isReady()
         self._protocol.setReady(readyState, manuallyInitiated=False)
         self.reIdentifyAsController()
@@ -857,6 +861,10 @@ class SyncplayClient(object):
                 filePath = ""
             reactor.callLater(0.1, self._playerClass.run, self, self._config['playerPath'], filePath, self._config['playerArgs'], )
             self._playerClass = None
+        self._startConnectionService(host, port, fatalOnFailure=True)
+        reactor.run()
+
+    def _startConnectionService(self, host, port, fatalOnFailure=False):
         self.protocolFactory = SyncClientFactory(self)
         if '[' in host:
             host = host.strip('[]')
@@ -893,18 +901,46 @@ class SyncplayClient(object):
         self._reconnectingService.startService()
 
         def connectedNow(f):
-            hostIP = connectionHandle.result.transport.addr[0]
+            try:
+                hostIP = f.transport.getPeer().host
+            except Exception:
+                hostIP = host
             self.ui.showMessage(getMessage("reachout-successful-notification").format(host, hostIP))
             return
 
         def failed(f):
-            reactor.callLater(0.1, self.ui.showErrorMessage, getMessage("connection-failed-notification"), True)
-            reactor.callLater(0.1, self.stop, True)
+            reactor.callLater(0.1, self.ui.showErrorMessage, getMessage("connection-failed-notification"), fatalOnFailure)
+            if fatalOnFailure:
+                reactor.callLater(0.1, self.stop, True)
 
-        connectionHandle = waitForConnection.addCallbacks(connectedNow, failed)
+        waitForConnection.addCallbacks(connectedNow, failed)
         message = getMessage("connection-attempt-notification").format(host, port)
         self.ui.showMessage(message)
-        reactor.run()
+
+    def switchServer(self, host, port, password, room):
+        """Move the running client to a newly hosted private server."""
+        host = str(host or "127.0.0.1").strip()
+        port = int(port)
+        password = str(password or "")
+        room = str(room or self.getUsername()).strip()
+        oldService = getattr(self, '_reconnectingService', None)
+        oldProtocol = self._protocol
+        if oldService:
+            try:
+                oldService.stopService()
+            except Exception:
+                pass
+        self.destroyProtocol(oldProtocol)
+        self._serverPassword = hashlib.md5(password.encode('utf-8')).hexdigest() if password else ""
+        self._host = "{}:{}".format(host, port)
+        self._publicServers = []
+        self._config['host'] = host
+        self._config['port'] = port
+        self._config['password'] = password
+        self._config['room'] = room
+        self.setRoom(room, resetAutoplay=True)
+        self._serverSupportsTLS = True
+        reactor.callLater(0.2, self._startConnectionService, host, port, False)
 
     def stop(self, promptForAction=False):
         if not self._running:
@@ -1712,12 +1748,15 @@ class UiManager(object):
             sys.stderr.write("{}{}\n".format(time.strftime(constants.UI_TIME_FORMAT, time.localtime()), message.rstrip()))
 
     def showChatMessage(self, username, userMessage):
-        messageString = "<{}> {}".format(username, userMessage)
-        if self._client._player.chatOSDSupported and self._client._config["chatOutputEnabled"]:
-            self._client._player.displayChatMessage(username, userMessage)
+        isLocal = username == self._client.getUsername()
+        if hasattr(self.__ui, "showChatMessage"):
+            self.__ui.showChatMessage(username, userMessage, isLocal)
         else:
-            self.showOSDMessage(messageString, duration=constants.OSD_DURATION)
-        self.__ui.showMessage(messageString)
+            self.__ui.showMessage("<{}> {}".format(username, userMessage))
+
+    def setConnected(self, connected, room=""):
+        if hasattr(self.__ui, "setConnected"):
+            self.__ui.setConnected(connected, room)
 
     def setSSLMode(self, sslMode, sslInformation=""):
         self.__ui.setSSLMode(sslMode, sslInformation)

@@ -8,6 +8,7 @@ Usage:
 from setuptools import setup
 from glob import glob
 import syncplay
+from syncplay.product import BUNDLE_IDENTIFIER, PRODUCT_NAME
 
 APP = ['syncplayClient.py']
 DATA_FILES = [
@@ -17,8 +18,9 @@ DATA_FILES = [
 OPTIONS = {
     'iconfile': 'syncplay/resources/icon.icns',
     'extra_scripts': 'syncplayServer.py',
-    'includes': {'PySide2.QtCore', 'PySide2.QtUiTools', 'PySide2.QtGui', 'PySide2.QtWidgets', 'certifi', 'cffi', 'pem', 'charset_normalizer.md__mypyc'},
-    'excludes': {'PySide', 'PySide.QtCore', 'PySide.QtUiTools', 'PySide.QtGui', 'tkinter'},
+    'includes': {'PySide6.QtCore', 'PySide6.QtGui', 'PySide6.QtWidgets', 'certifi', 'cffi', 'pem', 'charset_normalizer.md__mypyc'},
+    'excludes': {'PySide', 'PySide2', 'PySide.QtCore', 'PySide.QtUiTools', 'PySide.QtGui', 'tkinter'},
+    'arch': 'universal2',
     'qt_plugins': [
         'platforms/libqcocoa.dylib',
         'platforms/libqminimal.dylib',
@@ -26,17 +28,19 @@ OPTIONS = {
         'styles/libqmacstyle.dylib'
     ],
     'plist': {
-        'CFBundleName': 'Syncplay',
+        'CFBundleName': PRODUCT_NAME,
+        'CFBundleDisplayName': PRODUCT_NAME,
         'CFBundleShortVersionString': syncplay.version,
-        'CFBundleIdentifier': 'pl.syncplay.Syncplay',
-        'LSMinimumSystemVersion': '10.12.0',
-        'NSHumanReadableCopyright': 'Copyright © 2019 Syncplay All Rights Reserved',
+        'CFBundleVersion': syncplay.version,
+        'CFBundleIdentifier': BUNDLE_IDENTIFIER,
+        'LSMinimumSystemVersion': '13.0',
+        'NSHumanReadableCopyright': '{} is based on Syncplay and licensed under Apache 2.0.'.format(PRODUCT_NAME),
     }
 }
 
 setup(
     app=APP,
-    name='Syncplay',
+    name=PRODUCT_NAME,
     data_files=DATA_FILES,
     options={'py2app': OPTIONS},
     setup_requires=['py2app'],

@@ -13,8 +13,13 @@ from platform import python_version
 from twisted.internet import task
 
 from syncplay import utils, constants, version, revision, release_number
+from syncplay.chat import ChatStore
 from syncplay.messages import getMessage
+from syncplay.private_server import PrivateServerController
+from syncplay.product import PRODUCT_NAME, PRIVATE_SERVER_MENU_LABEL
 from syncplay.ui.consoleUI import ConsoleUI
+from syncplay.ui.chat_overlay import OverlayController
+from syncplay.ui.private_server_dialog import PrivateServerDialog
 from syncplay.utils import resourcespath
 from syncplay.utils import isLinux, isWindows, isMacOS
 from syncplay.utils import formatTime, sameFilename, sameFilesize, sameFileduration, RoomPasswordProvider, formatSize, isURL
@@ -145,7 +150,7 @@ class AboutDialog(QtWidgets.QDialog):
             if isWindows():
                 self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         self.setWindowIcon(QtGui.QPixmap(resourcespath + 'syncplay.png'))
-        nameLabel = QtWidgets.QLabel("<center><strong>Syncplay</strong></center>")
+        nameLabel = QtWidgets.QLabel("<center><strong>{}</strong></center>".format(PRODUCT_NAME))
         nameLabel.setFont(QtGui.QFont("Helvetica", 18))
         linkLabel = QtWidgets.QLabel()
         if isDarkMode:
@@ -159,7 +164,7 @@ class AboutDialog(QtWidgets.QDialog):
             "<br />Python " + python_version() + " - " + __binding__ + " " + __binding_version__ +
             " - Qt " + __qt_version__ + "</center></p>")
         licenseLabel = QtWidgets.QLabel(
-            "<center><p>Copyright &copy; 2012&ndash;2026 Syncplay</p><p>" +
+            "<center><p>{} is based on Syncplay 1.7.6.</p><p>".format(PRODUCT_NAME) +
             getMessage("about-dialog-license-text") + "</p></center>")
         aboutIcon = QtGui.QIcon()
         aboutIcon.addFile(resourcespath + "syncplayAbout.png")
@@ -493,6 +498,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.console:
             self.console.addClient(client)
         self.config = self._syncplayClient.getConfig()
+        self.overlayController.set_room(self._syncplayClient.getRoom())
         self.roomsCombobox.setEditText(self._syncplayClient.getRoom())
         self.fillRoomsCombobox()
         try:
@@ -527,11 +533,11 @@ class MainWindow(QtWidgets.QMainWindow):
         if not featureList["readiness"]:
             self.readyPushButton.setEnabled(False)
         if not featureList["chat"]:
-            self.chatFrame.setEnabled(False)
-            self.chatInput.setReadOnly(True)
+            self.overlayController.set_chat_enabled(False, constants.MAX_CHAT_MESSAGE_LENGTH)
+        else:
+            self.overlayController.set_chat_enabled(True, constants.MAX_CHAT_MESSAGE_LENGTH)
         if not featureList["sharedPlaylists"]:
             self.playlistGroup.setEnabled(False)
-        self.chatInput.setMaxLength(constants.MAX_CHAT_MESSAGE_LENGTH)
         #self.roomsCombobox.setMaxLength(constants.MAX_ROOM_NAME_LENGTH)
 
     def setSSLMode(self, sslMode, sslInformation):
@@ -561,6 +567,12 @@ class MainWindow(QtWidgets.QMainWindow):
             self.newMessage("{}<br />".format(message))
         else:
             self.newMessage(time.strftime(constants.UI_TIME_FORMAT, time.localtime()) + message + "<br />")
+
+    def showChatMessage(self, username, userMessage, isLocal=False):
+        self.chatStore.append(username, userMessage, is_local=isLocal)
+
+    def setConnected(self, connected, room=""):
+        self.overlayController.set_connected(connected, room)
 
     @needsClient
     def getFileSwitchState(self, filename):
@@ -924,6 +936,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def updateRoomName(self, room=""):
         self.roomsCombobox.setEditText(room)
+        self.overlayController.set_room(room)
         try:
             if self.config['autosaveJoinsToList']:
                 self.addRoomToList(room)
@@ -1025,6 +1038,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._syncplayClient.stop()
 
     def closeEvent(self, event):
+        self.overlayController.shutdown()
+        self.privateServerController.stop()
         self.exitSyncplay()
         self.saveSettings()
 
@@ -1430,9 +1445,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.showMessage("/{}".format(command))
         self.console.executeCommand(command)
 
-    def sendChatMessage(self):
-        chatText = self.chatInput.text()
-        self.chatInput.setText("")
+    def sendChatMessage(self, chatText):
+        chatText = str(chatText or "").strip()
         if chatText != "":
             if chatText[:1] == "/" and chatText != "/":
                 command = chatText[1:]
@@ -1461,23 +1475,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         window.outputlabel = QtWidgets.QLabel(getMessage("notifications-heading-label"))
         window.outputlabel.setMinimumHeight(27)
-        window.chatInput = QtWidgets.QLineEdit()
-        window.chatInput.setMaxLength(constants.MAX_CHAT_MESSAGE_LENGTH)
-        window.chatInput.returnPressed.connect(self.sendChatMessage)
-        window.chatButton = QtWidgets.QPushButton(
-            QtGui.QPixmap(resourcespath + 'email_go.png'),
-            getMessage("sendmessage-label"))
-        window.chatButton.pressed.connect(self.sendChatMessage)
-        window.chatLayout = QtWidgets.QHBoxLayout()
-        window.chatFrame = QtWidgets.QFrame()
-        window.chatFrame.setLayout(self.chatLayout)
-        window.chatFrame.setContentsMargins(0, 0, 0, 0)
-        window.chatFrame.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum)
-        window.chatLayout.setContentsMargins(0, 0, 0, 0)
-        self.chatButton.setToolTip(getMessage("sendmessage-tooltip"))
-        window.chatLayout.addWidget(window.chatInput)
-        window.chatLayout.addWidget(window.chatButton)
-        window.chatFrame.setMaximumHeight(window.chatFrame.sizeHint().height())
         window.outputFrame = QtWidgets.QFrame()
         window.outputFrame.setLineWidth(0)
         window.outputFrame.setMidLineWidth(0)
@@ -1485,7 +1482,6 @@ class MainWindow(QtWidgets.QMainWindow):
         window.outputLayout.setContentsMargins(0, 0, 0, 0)
         window.outputLayout.addWidget(window.outputlabel)
         window.outputLayout.addWidget(window.outputbox)
-        window.outputLayout.addWidget(window.chatFrame)
         window.outputFrame.setLayout(window.outputLayout)
 
         window.listLayout = QtWidgets.QVBoxLayout()
@@ -1732,6 +1728,9 @@ class MainWindow(QtWidgets.QMainWindow):
         window.reconnectAction = window.fileMenu.addAction(QtGui.QPixmap(resourcespath + "reconnect.png"), getMessage("reconnect-menu-label"))
         window.reconnectAction.triggered.connect(self.reconnectToServer)
 
+        window.privateServerAction = window.fileMenu.addAction(PRIVATE_SERVER_MENU_LABEL)
+        window.privateServerAction.triggered.connect(self.openPrivateServerDialog)
+
         window.exitAction = window.fileMenu.addAction(getMessage("exit-menu-label"))
         if isMacOS():
             window.exitAction.setMenuRole(QtWidgets.QAction.QuitRole)
@@ -1841,6 +1840,14 @@ class MainWindow(QtWidgets.QMainWindow):
     def openAbout(self):
         aboutMsgBox = AboutDialog()
         aboutMsgBox.exec_()
+
+    def openPrivateServerDialog(self):
+        dialog = PrivateServerDialog(self.privateServerController, self.connectToPrivateServer, self)
+        dialog.exec_()
+
+    @needsClient
+    def connectToPrivateServer(self, host, port, password, room):
+        self._syncplayClient.switchServer(host, port, password, room)
 
     def addMainFrame(self, window):
         window.mainFrame = QtWidgets.QFrame()
@@ -2135,6 +2142,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.hideEmptyRooms = False
         self.currentRooms = []
         self.QtGui = QtGui
+        self.chatStore = ChatStore()
+        self.overlayController = OverlayController(self.chatStore, self.sendChatMessage)
+        self.privateServerController = PrivateServerController()
         if isMacOS():
             self.setWindowFlags(self.windowFlags())
         else:
@@ -2142,7 +2152,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.setWindowFlags(self.windowFlags() & Qt.AA_DontUseNativeMenuBar)
             except TypeError:
                 self.setWindowFlags(self.windowFlags())
-        self.setWindowTitle("Syncplay v" + version + revision)
+        self.setWindowTitle("{} v{}{}".format(PRODUCT_NAME, version, revision))
         self.mainLayout = QtWidgets.QVBoxLayout()
         self.addTopLayout(self)
         self.addBottomLayout(self)

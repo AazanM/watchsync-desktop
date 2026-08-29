@@ -2015,7 +2015,16 @@ def _install():
 
     # Install missing member placeholders
     for name, members in _missing_members.items():
-        our_submodule = getattr(Qt, name)
+        try:
+            our_submodule = getattr(Qt, name)
+        except AttributeError:
+            # _setup() only creates a namespace for submodules it could
+            # import, so skip the ones this binding does not provide, exactly
+            # as the common-member loop above does. Without this a submodule
+            # missing from a frozen build surfaces as a confusing
+            # "partially initialized module" AttributeError.
+            _log("'%s' was missing." % name)
+            continue
 
         for member in members:
 

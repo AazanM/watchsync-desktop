@@ -21,6 +21,14 @@ $portable = Join-Path $root "dist\WatchSync Desktop\WatchSync Desktop.exe"
 if (-not (Test-Path $portable)) { throw "Expected executable was not produced: $portable" }
 Write-Host "Portable build ready: dist\WatchSync Desktop\"
 
+# Prove the frozen bundle can actually import Qt and the syncplay UI. Without
+# this a build that fails only at GUI startup looks completely successful.
+$smoke = Join-Path $root "dist\WatchSync Desktop\watchsync-smoketest.exe"
+if (-not (Test-Path $smoke)) { throw "Smoke test executable was not produced." }
+& $smoke
+if ($LASTEXITCODE -ne 0) { throw "Frozen bundle smoke test failed." }
+Write-Host "Smoke test passed."
+
 $makensisPath = $null
 $found = Get-Command makensis.exe -ErrorAction SilentlyContinue
 if ($found) {

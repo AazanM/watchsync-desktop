@@ -18,7 +18,7 @@ UninstPage instfiles
 
 Section "Install"
   SetOutPath "$INSTDIR"
-  File /r "${PROJECT_ROOT}\dist\${PRODUCT}\*"
+  File /r /x "watchsync-smoketest.exe" "${PROJECT_ROOT}\dist\${PRODUCT}\*"
   CreateDirectory "$SMPROGRAMS\${PRODUCT}"
   CreateShortcut "$SMPROGRAMS\${PRODUCT}\${PRODUCT}.lnk" "$INSTDIR\${PRODUCT}.exe"
   CreateShortcut "$DESKTOP\${PRODUCT}.lnk" "$INSTDIR\${PRODUCT}.exe"

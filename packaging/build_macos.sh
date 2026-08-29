@@ -66,4 +66,24 @@ lipo -archs "dist/WatchSync Desktop.app/Contents/MacOS/WatchSync Desktop" | grep
 lipo -archs "dist/WatchSync Desktop.app/Contents/MacOS/WatchSync Desktop" | grep -q x86_64
 lipo -archs "dist/WatchSync Desktop.app/Contents/MacOS/syncplayServer" | grep -q arm64
 lipo -archs "dist/WatchSync Desktop.app/Contents/MacOS/syncplayServer" | grep -q x86_64
+# Launch the bundle from a neutral directory. Run from the project root the
+# frozen app would import syncplay from the source tree and mask packaging
+# faults, so a broken bundle looks healthy. A crash shows up as an early exit.
+app_bin="$project_dir/dist/WatchSync Desktop.app/Contents/MacOS/WatchSync Desktop"
+launch_log=$(mktemp)
+( cd / && "$app_bin" >"$launch_log" 2>&1 ) &
+launch_pid=$!
+sleep 20
+if kill -0 "$launch_pid" 2>/dev/null; then
+  kill "$launch_pid" 2>/dev/null || true
+  wait "$launch_pid" 2>/dev/null || true
+  echo "Launch check passed."
+else
+  echo "The app bundle exited during startup:" >&2
+  cat "$launch_log" >&2
+  rm -f "$launch_log"
+  exit 1
+fi
+rm -f "$launch_log"
+
 echo "App bundle: $project_dir/dist/WatchSync Desktop.app"

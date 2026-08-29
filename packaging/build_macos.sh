@@ -40,6 +40,25 @@ mkdir -p "$wheel_dir"
   --find-links "$wheel_dir" \
   'cryptography>=46,<48' charset-normalizer
 
+# PySide6 6.11 ships as a namespace package (no __init__.py), which
+# modulegraph's legacy imp.find_module cannot resolve, so py2app's "packages"
+# option rejects it. py2app's own pyside6 recipe means to request the same
+# thing but misspells the key as "packagse", so PySide6 is swept into the
+# zipped site-packages where its dylibs cannot be dlopen'd. Materialising an
+# empty __init__.py makes it a regular package for the duration of the build.
+"$python_bin" - <<'PY'
+import os
+import PySide6
+
+for package in (PySide6,):
+    root = list(package.__path__)[0]
+    init = os.path.join(root, "__init__.py")
+    if not os.path.exists(init):
+        with open(init, "w") as handle:
+            handle.write("")
+        print("created", init)
+PY
+
 "$python_bin" buildPy2app.py py2app
 
 codesign --force --deep --sign - "dist/WatchSync Desktop.app"

@@ -3,19 +3,23 @@
 import os
 import sys
 
-# PyInstaller execs this spec with the project root as the working
-# directory but not on sys.path, so make the import below resolve.
-sys.path.insert(0, os.path.abspath(os.getcwd()))
+# PyInstaller resolves relative paths in a spec against the spec's own
+# directory and execs it without the project root on sys.path, so anchor
+# everything to the repository root explicitly.
+PROJECT_ROOT = os.path.abspath(os.path.join(SPECPATH, os.pardir))
+sys.path.insert(0, PROJECT_ROOT)
 
 from PyInstaller.utils.hooks import collect_submodules
 from syncplay.product import PRODUCT_NAME
 
-resource_data = [("syncplay/resources", "syncplay/resources")]
+resource_data = [
+    (os.path.join(PROJECT_ROOT, "syncplay", "resources"), "syncplay/resources")
+]
 hidden = collect_submodules("twisted.plugins")
 
 client = Analysis(
-    ["syncplayClient.py"],
-    pathex=["."],
+    [os.path.join(PROJECT_ROOT, "syncplayClient.py")],
+    pathex=[PROJECT_ROOT],
     binaries=[],
     datas=resource_data,
     hiddenimports=hidden,
@@ -37,12 +41,12 @@ client_exe = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon="syncplay/resources/icon.ico",
+    icon=os.path.join(PROJECT_ROOT, "syncplay", "resources", "icon.ico"),
 )
 
 server = Analysis(
-    ["syncplayServer.py"],
-    pathex=["."],
+    [os.path.join(PROJECT_ROOT, "syncplayServer.py")],
+    pathex=[PROJECT_ROOT],
     binaries=[],
     datas=resource_data,
     hiddenimports=hidden,
@@ -64,7 +68,7 @@ server_exe = EXE(
     strip=False,
     upx=True,
     console=True,
-    icon="syncplay/resources/icon.ico",
+    icon=os.path.join(PROJECT_ROOT, "syncplay", "resources", "icon.ico"),
 )
 
 bundle = COLLECT(

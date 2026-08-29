@@ -1502,7 +1502,15 @@ def _pyside6():
     # PySide6-Essentials intentionally provides the PySide6 namespace without
     # the heavyweight Addons metapackage (and therefore without __version__ on
     # the namespace module). QtCore exposes the same binding version.
-    Qt.__binding_version__ = getattr(module, "__version__", Qt._QtCore.__version__)
+    if not hasattr(Qt, "_QtCore"):
+        # _setup() swallows submodule import failures, so a PySide6 whose
+        # native libraries cannot be loaded would otherwise surface far away
+        # as an AttributeError. Fail as an ImportError so _install() can move
+        # on to the next candidate binding.
+        raise ImportError("PySide6.QtCore could not be imported")
+
+    Qt.__binding_version__ = getattr(
+        module, "__version__", None) or Qt._QtCore.__version__
 
     if hasattr(Qt, "_shiboken6"):
         Qt.QtCompat.wrapInstance = _wrapinstance

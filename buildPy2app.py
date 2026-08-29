@@ -19,6 +19,13 @@ OPTIONS = {
     'iconfile': 'syncplay/resources/icon.icns',
     'extra_scripts': 'syncplayServer.py',
     'includes': {'PySide6.QtCore', 'PySide6.QtGui', 'PySide6.QtWidgets', 'certifi', 'cffi', 'pem', 'charset_normalizer.md__mypyc'},
+    # PySide6 and shiboken6 ship dylibs and Qt frameworks alongside their
+    # extension modules. Collected into the zipped site-packages they cannot
+    # be dlopen'd, so QtCore.so fails to resolve @rpath/libpyside6.abi3.dylib
+    # and the app dies during Qt binding setup. Listing them as packages
+    # keeps the whole tree on disk inside the bundle.
+    'packages': ['PySide6', 'shiboken6', 'certifi'],
+
     'excludes': {'PySide', 'PySide2', 'PySide.QtCore', 'PySide.QtUiTools', 'PySide.QtGui', 'tkinter'},
     'arch': 'universal2',
     'qt_plugins': [

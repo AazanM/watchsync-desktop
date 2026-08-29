@@ -1,5 +1,12 @@
 # Build with: pyinstaller --noconfirm packaging/watchsync-windows.spec
 
+import os
+import sys
+
+# PyInstaller execs this spec with the project root as the working
+# directory but not on sys.path, so make the import below resolve.
+sys.path.insert(0, os.path.abspath(os.getcwd()))
+
 from PyInstaller.utils.hooks import collect_submodules
 from syncplay.product import PRODUCT_NAME
 
